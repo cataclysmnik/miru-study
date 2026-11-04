@@ -3,19 +3,14 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import {
-  X,
   Download,
   ExternalLink,
   FileText,
   Loader2,
   Maximize2,
   Minimize2,
+  X,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 const NativePDFCanvas = dynamic(
@@ -92,33 +87,58 @@ export function PDFViewerModal({
     }
   }, [open]);
 
+  // Handle ESC key to exit fullscreen first or close modal
+  React.useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isFullscreen) {
+          e.stopPropagation();
+          setIsFullscreen(false);
+        } else {
+          onOpenChange(false);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, isFullscreen, onOpenChange]);
+
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        overlayClassName="bg-black/90 backdrop-blur-none"
-        className={`flex flex-col p-0 gap-0 overflow-hidden border border-border bg-card shadow-2xl transition-all duration-300 ease-out ${
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+      {/* 100% Solid Opaque Backdrop - No translucent bleedthrough */}
+      <div
+        className="fixed inset-0 bg-[#0f100d] opacity-95 transition-opacity duration-200"
+        onClick={() => onOpenChange(false)}
+      />
+
+      {/* Reader Container - Centered Modal scaling smoothly from center */}
+      <div
+        className={`relative z-10 flex flex-col overflow-hidden border border-border bg-card shadow-2xl transition-all duration-300 ease-in-out ${
           isFullscreen
-            ? "!w-screen !max-w-none !h-screen !rounded-none !top-0 !left-0 !translate-x-0 !translate-y-0"
-            : "!w-[95vw] !max-w-[1300px] !h-[92vh] rounded-2xl"
+            ? "w-screen h-screen rounded-none"
+            : "w-[94vw] max-w-[1300px] h-[92vh] rounded-2xl"
         }`}
       >
         {/* Miru Native Header Toolbar */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-card select-none shrink-0">
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-card select-none shrink-0 z-20">
           <div className="flex items-center gap-3 truncate pr-4 sm:pr-8">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary shrink-0">
               <FileText className="h-4 w-4" />
             </div>
             <div className="truncate">
-              <DialogTitle className="text-sm font-semibold truncate leading-tight text-foreground">
+              <h2 className="text-sm font-semibold truncate leading-tight text-foreground">
                 {title}
-              </DialogTitle>
+              </h2>
               <p className="text-[11px] text-muted-foreground">
                 Miru Native Reader • Continuous Canvas
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 mr-8">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Fullscreen Toggle Button */}
             <Button
               variant="outline"
@@ -166,15 +186,23 @@ export function PDFViewerModal({
                 </Button>
               </>
             )}
+
+            {/* Explicit Close Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted ml-1"
+              title="Close reader"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
           </div>
         </div>
 
         {/* Native PDF Canvas Continuous Reader Area */}
-        <div
-          className={`w-full relative overflow-hidden bg-card transition-all duration-300 ease-out ${
-            isFullscreen ? "h-[calc(100vh-60px)]" : "h-[calc(92vh-60px)]"
-          }`}
-        >
+        <div className="flex-1 w-full h-full relative overflow-hidden bg-card">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-muted-foreground animate-pulse">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -193,7 +221,7 @@ export function PDFViewerModal({
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
