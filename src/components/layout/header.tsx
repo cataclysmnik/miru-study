@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Search, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { UserProfileMenu } from "@/components/layout/user-profile-menu";
+import { GlobalSearch } from "@/components/layout/global-search";
 
 interface HeaderProps {
   onOpenMobileNav: () => void;
@@ -31,19 +32,9 @@ export function Header({ onOpenMobileNav }: HeaderProps) {
         </div>
       </div>
 
-      {/* Middle: Mindful Global Search Bar */}
+      {/* Middle: Functional Mindful Global Search Bar */}
       <div className="hidden max-w-md flex-1 md:flex px-6">
-        <div className="relative w-full">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            placeholder="Search courses, syllabi, notes, formula sheets..."
-            className="h-10 w-full rounded-xl border border-border bg-background/50 pl-10 pr-4 text-xs font-normal text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary transition-all"
-          />
-          <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            ⌘K
-          </kbd>
-        </div>
+        <GlobalSearch />
       </div>
 
       {/* Right: Actions, Theme, and Profile */}
