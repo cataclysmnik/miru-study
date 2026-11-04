@@ -108,13 +108,15 @@ export function PDFViewerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
-      {/* 100% Solid Opaque Backdrop - No translucent bleedthrough */}
+      {/* Dynamic Theme Opaque Scrim Backdrop:
+          Light Mode: Warm Sand/Stone dimming
+          Dark Mode: Rich Wabi-Sabi Dark Slate/Earth dimming */}
       <div
-        className="fixed inset-0 bg-[#0f100d] opacity-95 transition-opacity duration-200"
+        className="fixed inset-0 bg-stone-900/60 dark:bg-black/75 transition-opacity duration-200"
         onClick={() => onOpenChange(false)}
       />
 
-      {/* Reader Container - Centered Modal scaling smoothly from center */}
+      {/* Reader Container - Centered Modal scaling smoothly from center with wabi-sabi card tokens */}
       <div
         className={`relative z-10 flex flex-col overflow-hidden border border-border bg-card shadow-2xl transition-all duration-300 ease-in-out ${
           isFullscreen
