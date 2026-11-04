@@ -1,26 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { Search, Bell, Menu, Sparkles } from "lucide-react";
+import { Search, Menu } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuth } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
+import { UserProfileMenu } from "@/components/layout/user-profile-menu";
 
 interface HeaderProps {
   onOpenMobileNav: () => void;
 }
 
 export function Header({ onOpenMobileNav }: HeaderProps) {
-  const { profile } = useAuth();
-
   return (
     <header className="sticky top-0 z-20 flex h-20 w-full items-center justify-between border-b border-border bg-card/80 px-4 md:px-8 backdrop-blur-md">
       {/* Left: Mobile trigger & breadcrumb / current term indicator */}
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileNav}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border md:hidden text-foreground hover:bg-muted"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border md:hidden text-foreground hover:bg-muted cursor-pointer"
           aria-label="Open navigation"
         >
           <Menu className="h-5 w-5" />
@@ -55,19 +52,9 @@ export function Header({ onOpenMobileNav }: HeaderProps) {
 
         <div className="hidden h-5 w-[1px] bg-border sm:block" />
 
-        {/* User Profile Pill */}
-        <div className="flex items-center gap-2.5 rounded-full border border-border bg-background/40 py-1 pl-1.5 pr-3 hover:border-primary/40 transition-colors">
-          <Avatar className="h-7 w-7 border-0">
-            {profile?.avatarUrl && <AvatarImage src={profile.avatarUrl} alt={profile.fullName} />}
-            <AvatarFallback>{profile?.fullName?.substring(0, 2).toUpperCase() || "ME"}</AvatarFallback>
-          </Avatar>
-          <div className="hidden flex-col text-left text-xs md:flex">
-            <span className="font-semibold text-foreground leading-tight">{profile?.fullName}</span>
-            <span className="text-[10px] text-muted-foreground">{profile?.academicRole}</span>
-          </div>
-        </div>
+        {/* User Profile / Google Sign-in */}
+        <UserProfileMenu />
       </div>
     </header>
   );
 }
-
