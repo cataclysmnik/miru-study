@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-// Dynamically import Native PDF canvas to guarantee no SSR mismatch
 const NativePDFCanvas = dynamic(
   () =>
     import("@/components/viewer/native-pdf-canvas").then(
@@ -25,8 +24,8 @@ const NativePDFCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full w-full items-center justify-center bg-[#181916] text-[#b5b3a8] text-xs">
-        <Loader2 className="h-6 w-6 animate-spin text-[#6b8048] mr-2" />
+      <div className="flex h-full w-full items-center justify-center bg-background text-muted-foreground text-xs">
+        <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
         <span>Loading document engine...</span>
       </div>
     ),
@@ -85,19 +84,19 @@ export function PDFViewerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[94vw] !max-w-[1300px] !h-[92vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border border-[#2e302b] bg-[#181916] shadow-2xl">
+      <DialogContent className="!w-[94vw] !max-w-[1300px] !h-[92vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         {/* Miru Native Header Toolbar */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-[#2e302b] bg-[#1d1f1b] select-none shrink-0">
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-card select-none shrink-0">
           <div className="flex items-center gap-3 truncate pr-8">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6b8048]/20 text-[#6b8048] shrink-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary shrink-0">
               <FileText className="h-4 w-4" />
             </div>
             <div className="truncate">
-              <DialogTitle className="text-sm font-semibold truncate leading-tight text-[#e7e6df]">
+              <DialogTitle className="text-sm font-semibold truncate leading-tight text-foreground">
                 {title}
               </DialogTitle>
-              <p className="text-[11px] text-[#b5b3a8]">
-                Miru Native Reader • Wabi-Sabi Study Canvas
+              <p className="text-[11px] text-muted-foreground">
+                Miru Native Reader • Academic Document Canvas
               </p>
             </div>
           </div>
@@ -109,7 +108,7 @@ export function PDFViewerModal({
                   variant="outline"
                   size="sm"
                   asChild
-                  className="h-8 gap-1.5 text-xs border-[#2e302b] text-[#e7e6df] hover:bg-[#2e302b]"
+                  className="h-8 gap-1.5 text-xs border-border text-foreground hover:bg-muted"
                 >
                   <a href={activeUrl} download={title} target="_blank" rel="noopener noreferrer">
                     <Download className="h-3.5 w-3.5" />
@@ -120,7 +119,7 @@ export function PDFViewerModal({
                   variant="outline"
                   size="sm"
                   asChild
-                  className="h-8 gap-1.5 text-xs border-[#2e302b] text-[#e7e6df] hover:bg-[#2e302b]"
+                  className="h-8 gap-1.5 text-xs border-border text-foreground hover:bg-muted"
                 >
                   <a href={activeUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -133,21 +132,21 @@ export function PDFViewerModal({
         </div>
 
         {/* Native PDF Canvas Component */}
-        <div className="flex-1 w-full h-[calc(92vh-60px)] relative overflow-hidden bg-[#181916]">
+        <div className="flex-1 w-full h-[calc(92vh-60px)] relative overflow-hidden bg-background">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-[#b5b3a8] animate-pulse">
-              <Loader2 className="h-6 w-6 animate-spin text-[#6b8048]" />
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-muted-foreground animate-pulse">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <span>Streaming secure preview from Supabase...</span>
             </div>
           ) : errorMsg ? (
             <div className="p-8 text-center space-y-2">
               <FileText className="h-8 w-8 text-destructive mx-auto" />
-              <p className="text-xs text-[#e7e6df]">{errorMsg}</p>
+              <p className="text-xs text-foreground">{errorMsg}</p>
             </div>
           ) : activeUrl ? (
             <NativePDFCanvas url={activeUrl} />
           ) : (
-            <div className="text-xs text-[#b5b3a8]">No preview available</div>
+            <div className="text-xs text-muted-foreground">No preview available</div>
           )}
         </div>
       </DialogContent>
