@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
   ZoomIn,
   ZoomOut,
   RotateCw,
@@ -16,15 +14,18 @@ interface NativePDFCanvasProps {
   url: string;
 }
 
+interface PageItem {
+  pageNumber: number;
+}
+
 export function NativePDFCanvas({ url }: NativePDFCanvasProps) {
   const [numPages, setNumPages] = React.useState<number>(0);
-  const [pageNumber, setPageNumber] = React.useState<number>(1);
   const [scale, setScale] = React.useState<number>(1.25);
   const [rotation, setRotation] = React.useState<number>(0);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
   const pdfDocRef = React.useRef<any>(null);
 
   // Initialize PDF.js
@@ -49,12 +50,11 @@ export function NativePDFCanvas({ url }: NativePDFCanvasProps) {
 
         pdfDocRef.current = doc;
         setNumPages(doc.numPages);
-        setPageNumber(1);
         setIsLoading(false);
       } catch (err: any) {
         if (!isCancelled) {
-          console.error("PDF render error:", err);
-          setErrorMsg(err.message || "Failed to parse PDF pages");
+          console.error("PDF load error:", err);
+          setErrorMsg(err.message || "Failed to parse PDF document");
           setIsLoading(false);
         }
       }
@@ -67,76 +67,17 @@ export function NativePDFCanvas({ url }: NativePDFCanvasProps) {
     };
   }, [url]);
 
-  // Render current page to HTML5 Canvas
-  React.useEffect(() => {
-    let renderTask: any = null;
-
-    async function renderPage() {
-      if (!pdfDocRef.current || !canvasRef.current) return;
-
-      try {
-        const page = await pdfDocRef.current.getPage(pageNumber);
-        const viewport = page.getViewport({ scale, rotation });
-
-        const canvas = canvasRef.current;
-        const context = canvas.getContext("2d");
-        if (!context) return;
-
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        const renderContext = {
-          canvasContext: context,
-          viewport,
-        };
-
-        renderTask = page.render(renderContext);
-        await renderTask.promise;
-      } catch (e: any) {
-        if (e?.name !== "RenderingCancelledException") {
-          console.warn("Canvas render notice:", e);
-        }
-      }
-    }
-
-    renderPage();
-
-    return () => {
-      if (renderTask) {
-        renderTask.cancel();
-      }
-    };
-  }, [pageNumber, scale, rotation, numPages]);
-
   return (
-    <div className="flex flex-col h-full w-full bg-background text-foreground">
-      {/* Mindful Wabi-Sabi Custom Navigation Ribbon */}
-      <div className="flex items-center justify-between px-6 py-2.5 border-b border-border bg-card/90 backdrop-blur select-none z-10 shrink-0">
+    <div className="flex flex-col h-full w-full bg-card text-foreground">
+      {/* Mindful Sticky Navigation & Zoom Ribbon */}
+      <div className="flex items-center justify-between px-6 py-2.5 border-b border-border bg-card/95 backdrop-blur select-none z-10 shrink-0">
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
-            disabled={pageNumber <= 1}
-            className="h-8 w-8 p-0 text-foreground hover:bg-muted"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-
           <span className="text-xs font-mono tracking-wide text-muted-foreground">
-            Page <span className="text-foreground font-semibold">{pageNumber}</span> of{" "}
-            <span className="text-foreground">{numPages || "–"}</span>
+            Total Pages: <span className="text-foreground font-semibold">{numPages || "–"}</span>
           </span>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
-            disabled={pageNumber >= numPages}
-            className="h-8 w-8 p-0 text-foreground hover:bg-muted"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <span className="text-[11px] text-muted-foreground/80 hidden sm:inline">
+            • Scroll continuously to read
+          </span>
         </div>
 
         {/* Zoom & Rotation Controls */}
@@ -144,7 +85,7 @@ export function NativePDFCanvas({ url }: NativePDFCanvasProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setScale((s) => Math.max(0.75, s - 0.2))}
+            onClick={() => setScale((s) => Math.max(0.6, Number((s - 0.15).toFixed(2))))}
             className="h-8 w-8 p-0 text-foreground hover:bg-muted"
             title="Zoom out"
           >
@@ -156,7 +97,7 @@ export function NativePDFCanvas({ url }: NativePDFCanvasProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setScale((s) => Math.min(2.5, s + 0.2))}
+            onClick={() => setScale((s) => Math.min(2.5, Number((s + 0.15).toFixed(2))))}
             className="h-8 w-8 p-0 text-foreground hover:bg-muted"
             title="Zoom in"
           >
@@ -177,23 +118,135 @@ export function NativePDFCanvas({ url }: NativePDFCanvasProps) {
         </div>
       </div>
 
-      {/* Document View Canvas Area */}
-      <div className="flex-1 overflow-auto p-6 sm:p-8 flex justify-center items-start bg-muted/40">
+      {/* Document Vertical Continuous Scroll View Area */}
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-8 flex flex-col items-center gap-6 bg-muted/40"
+      >
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-muted-foreground animate-pulse">
+          <div className="flex flex-col items-center justify-center my-auto py-24 gap-3 text-xs text-muted-foreground animate-pulse">
             <Loader2 className="h-7 w-7 animate-spin text-primary" />
             <span>Rendering high-fidelity pages...</span>
           </div>
         ) : errorMsg ? (
-          <div className="text-center p-8 space-y-2">
+          <div className="text-center p-8 space-y-2 my-auto">
             <FileText className="h-8 w-8 text-destructive mx-auto" />
             <p className="text-xs text-foreground">{errorMsg}</p>
           </div>
         ) : (
-          <div className="rounded-xl shadow-xl overflow-hidden border border-border bg-white transition-transform">
-            <canvas ref={canvasRef} className="block" />
-          </div>
+          Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+            <PDFPageCanvas
+              key={`pdf-page-${pageNum}`}
+              pdfDoc={pdfDocRef.current}
+              pageNumber={pageNum}
+              scale={scale}
+              rotation={rotation}
+              containerWidth={containerRef.current?.clientWidth}
+            />
+          ))
         )}
+      </div>
+    </div>
+  );
+}
+
+interface PDFPageCanvasProps {
+  pdfDoc: any;
+  pageNumber: number;
+  scale: number;
+  rotation: number;
+  containerWidth?: number;
+}
+
+function PDFPageCanvas({
+  pdfDoc,
+  pageNumber,
+  scale,
+  rotation,
+}: PDFPageCanvasProps) {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [rendered, setRendered] = React.useState(false);
+  const [isInView, setIsInView] = React.useState(false);
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Lazy render using IntersectionObserver for smooth performance on multi-page PDFs
+  React.useEffect(() => {
+    if (!wrapperRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          setIsInView(true);
+        }
+      },
+      {
+        rootMargin: "300px 0px 300px 0px", // pre-render when 300px away
+      }
+    );
+
+    observer.observe(wrapperRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  React.useEffect(() => {
+    if (!pdfDoc || !canvasRef.current || !isInView) return;
+
+    let renderTask: any = null;
+    let isCancelled = false;
+
+    async function renderPage() {
+      try {
+        const page = await pdfDoc.getPage(pageNumber);
+        if (isCancelled) return;
+
+        const viewport = page.getViewport({ scale, rotation });
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const context = canvas.getContext("2d");
+        if (!context) return;
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: context,
+          viewport,
+        };
+
+        renderTask = page.render(renderContext);
+        await renderTask.promise;
+        if (!isCancelled) {
+          setRendered(true);
+        }
+      } catch (e: any) {
+        if (e?.name !== "RenderingCancelledException") {
+          console.warn(`Render error page ${pageNumber}:`, e);
+        }
+      }
+    }
+
+    renderPage();
+
+    return () => {
+      isCancelled = true;
+      if (renderTask) {
+        renderTask.cancel();
+      }
+    };
+  }, [pdfDoc, pageNumber, scale, rotation, isInView]);
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="flex flex-col items-center relative group"
+    >
+      <div className="rounded-xl shadow-lg border border-border bg-white overflow-hidden transition-all duration-150">
+        <canvas ref={canvasRef} className="block max-w-full h-auto" />
+      </div>
+      <div className="mt-2 text-[11px] font-mono text-muted-foreground opacity-60 group-hover:opacity-100 transition-opacity">
+        Page {pageNumber}
       </div>
     </div>
   );
