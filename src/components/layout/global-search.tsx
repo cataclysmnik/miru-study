@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -36,6 +37,7 @@ export function GlobalSearch() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const [mounted, setMounted] = React.useState(false);
 
   // PDF Viewer for directly opening PDF search results
   const [viewerOpen, setViewerOpen] = React.useState(false);
@@ -45,7 +47,11 @@ export function GlobalSearch() {
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
 
-  // Keyboard shortcut: Cmd+K / Ctrl+K or "/"
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Keyboard shortcut: Cmd+K / Ctrl+K
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -265,7 +271,7 @@ export function GlobalSearch() {
     <>
       {/* Trigger Input in Header */}
       <div className="relative w-full max-w-md">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <input
           type="text"
           readOnly
@@ -280,142 +286,147 @@ export function GlobalSearch() {
         </div>
       </div>
 
-      {/* Global Command Palette Modal */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 pointer-events-auto">
-          {/* Backdrop with Frosted Blur */}
-          <div
-            className="fixed inset-0 bg-stone-900/60 dark:bg-black/75 backdrop-blur-md transition-opacity"
-            onClick={() => setIsOpen(false)}
-          />
+      {/* Global Command Palette Portal attached directly to document.body */}
+      {mounted &&
+        isOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4 pointer-events-auto">
+            {/* Backdrop with Frosted Blur across entire window */}
+            <div
+              className="fixed inset-0 bg-stone-900/60 dark:bg-black/75 backdrop-blur-md transition-opacity"
+              onClick={() => setIsOpen(false)}
+            />
 
-          {/* Search Palette Container */}
-          <div
-            ref={containerRef}
-            className="relative z-10 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 duration-150"
-          >
-            {/* Input Header */}
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-card">
-              <Search className="h-4 w-4 text-primary shrink-0" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelectedIndex(0);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Search courses, modules, topics, PDFs, or AI notes..."
-                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  className="text-muted-foreground hover:text-foreground text-xs p-1"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Results Stream */}
-            <div className="max-h-[60vh] overflow-y-auto p-2">
-              {results.length === 0 ? (
-                <div className="py-12 text-center text-xs text-muted-foreground space-y-1">
-                  <p>No results found for &ldquo;{query}&rdquo;</p>
-                  <p className="text-[11px] opacity-70">
-                    Try searching for course codes, topic names, or material titles.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {query.trim() ? "Search Results" : "Quick Suggestions"}
-                  </div>
-                  {results.map((item, index) => {
-                    const isSelected = index === selectedIndex;
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => handleSelect(item)}
-                        onMouseEnter={() => setSelectedIndex(index)}
-                        className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-colors ${
-                          isSelected
-                            ? "bg-primary/10 text-foreground"
-                            : "hover:bg-muted/60 text-foreground"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 truncate">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
-                            {getCategoryIcon(item.category)}
-                          </div>
-                          <div className="truncate">
-                            <div className="text-xs font-medium text-foreground truncate">
-                              {item.title}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground truncate">
-                              {item.subtitle}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 ml-4">
-                          {item.badge && (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border border-border bg-muted text-muted-foreground">
-                              {item.badge}
-                            </span>
-                          )}
-                          <ArrowRight
-                            className={`h-3.5 w-3.5 transition-transform ${
-                              isSelected
-                                ? "text-primary translate-x-0.5"
-                                : "text-muted-foreground/40"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Palette Footer Help */}
-            <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-muted/40 text-[11px] text-muted-foreground select-none">
-              <div className="flex items-center gap-3">
-                <span>
-                  <kbd className="px-1.5 py-0.5 rounded border border-border bg-card font-mono text-[10px]">
-                    ↑↓
-                  </kbd>{" "}
-                  Navigate
-                </span>
-                <span>
-                  <kbd className="px-1.5 py-0.5 rounded border border-border bg-card font-mono text-[10px]">
-                    ↵
-                  </kbd>{" "}
-                  Select
-                </span>
-                <span>
-                  <kbd className="px-1.5 py-0.5 rounded border border-border bg-card font-mono text-[10px]">
-                    esc
-                  </kbd>{" "}
-                  Close
-                </span>
+            {/* Search Palette Container */}
+            <div
+              ref={containerRef}
+              className="relative z-10 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 duration-150"
+            >
+              {/* Input Header */}
+              <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-card">
+                <Search className="h-4 w-4 text-primary shrink-0" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setSelectedIndex(0);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Search courses, modules, topics, PDFs, or AI notes..."
+                  className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    className="text-muted-foreground hover:text-foreground text-xs p-1 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
-              <span className="font-mono text-[10px] text-primary">Miru Academic Search</span>
+
+              {/* Results Stream */}
+              <div className="max-h-[60vh] overflow-y-auto p-2">
+                {results.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-muted-foreground space-y-1">
+                    <p>No results found for &ldquo;{query}&rdquo;</p>
+                    <p className="text-[11px] opacity-70">
+                      Try searching for course codes, topic names, or material titles.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {query.trim() ? "Search Results" : "Quick Suggestions"}
+                    </div>
+                    {results.map((item, index) => {
+                      const isSelected = index === selectedIndex;
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => handleSelect(item)}
+                          onMouseEnter={() => setSelectedIndex(index)}
+                          className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-primary/10 text-foreground"
+                              : "hover:bg-muted/60 text-foreground"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 truncate">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+                              {getCategoryIcon(item.category)}
+                            </div>
+                            <div className="truncate">
+                              <div className="text-xs font-medium text-foreground truncate">
+                                {item.title}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground truncate">
+                                {item.subtitle}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 ml-4">
+                            {item.badge && (
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border border-border bg-muted text-muted-foreground">
+                                {item.badge}
+                              </span>
+                            )}
+                            <ArrowRight
+                              className={`h-3.5 w-3.5 transition-transform ${
+                                isSelected
+                                  ? "text-primary translate-x-0.5"
+                                  : "text-muted-foreground/40"
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Palette Footer Help */}
+              <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-muted/40 text-[11px] text-muted-foreground select-none">
+                <div className="flex items-center gap-3">
+                  <span>
+                    <kbd className="px-1.5 py-0.5 rounded border border-border bg-card font-mono text-[10px]">
+                      ↑↓
+                    </kbd>{" "}
+                    Navigate
+                  </span>
+                  <span>
+                    <kbd className="px-1.5 py-0.5 rounded border border-border bg-card font-mono text-[10px]">
+                      ↵
+                    </kbd>{" "}
+                    Select
+                  </span>
+                  <span>
+                    <kbd className="px-1.5 py-0.5 rounded border border-border bg-card font-mono text-[10px]">
+                      esc
+                    </kbd>{" "}
+                    Close
+                  </span>
+                </div>
+                <span className="font-mono text-[10px] text-primary">Miru Academic Search</span>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* Direct PDF Viewer Modal when opening PDFs from Search */}
-      <PDFViewerModal
-        open={viewerOpen}
-        onOpenChange={setViewerOpen}
-        title={viewerTitle}
-        storagePath={viewerStoragePath}
-      />
+      {viewerOpen && (
+        <PDFViewerModal
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          title={viewerTitle}
+          storagePath={viewerStoragePath}
+        />
+      )}
     </>
   );
 }
