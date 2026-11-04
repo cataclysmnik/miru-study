@@ -28,22 +28,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Prompt specifically instructing extraction of both modules AND their constituent topics
+    // Force extraction of ALL modules without early stopping
     const extractionPrompt = `You are an expert academic curriculum parser.
-Analyze this official course syllabus document for "${courseName || "Academic Course"}":
+Analyze this official syllabus document for "${courseName || "Academic Course"}":
 
---- SYLLABUS DOCUMENT ---
-${extractedText.slice(0, 25000)}
--------------------------
+--- FULL SYLLABUS TEXT ---
+${extractedText.slice(0, 35000)}
+--------------------------
 
-Carefully extract EVERY Module and its individual constituent topics.
-In typical university syllabi, each module contains multiple topics separated by dashes (- or –), commas, or semicolons. Break each module's content into separate clean topic titles.
+CRITICAL REQUIREMENTS:
+1. You MUST extract EVERY SINGLE MODULE present in the syllabus (e.g. Module 1, Module 2, Module 3, Module 4, Module 5, Module 6, Module 7, Module 8, etc.). Do NOT omit or truncate any modules.
+2. For each module, break apart its text into discrete constituent topics (split by dashes, commas, bullets, or semicolons).
+3. Extract the lecture hours / weightage if stated (e.g. "4 hours", "3 hours", "5 hours").
 
-Return ONLY a valid JSON array matching this exact schema with NO backticks and NO other text:
+Return ONLY a valid JSON array of ALL modules matching this exact schema, with NO markdown backticks and NO other text:
 [
   {
     "title": "Module 1: Introduction to Autonomous Drones",
-    "description": "Foundations, types, and drone components",
+    "description": "Foundations and component overview",
     "hours": "4 hours",
     "topics": [
       "History of Drones",
@@ -54,20 +56,26 @@ Return ONLY a valid JSON array matching this exact schema with NO backticks and 
       "ESC: Electronic Speed Controller",
       "Propellers"
     ]
+  },
+  {
+    "title": "Module 2: Design Fundamentals",
+    "description": "Controllers and transmission systems",
+    "hours": "3 hours",
+    "topics": [
+      "Flight Controllers",
+      "RC Transmitters",
+      "FPV Systems",
+      "Telemetry",
+      "Timing Gates"
+    ]
   }
 ]`;
 
-    let rawJsonText = "";
-    try {
-      rawJsonText = await callGemini(
-        extractionPrompt,
-        "gemini-flash-latest",
-        byokKey || undefined
-      );
-    } catch (apiErr) {
-      console.warn("Gemini syllabus extraction fallback:", apiErr);
-      throw apiErr;
-    }
+    const rawJsonText = await callGemini(
+      extractionPrompt,
+      "gemini-flash-latest",
+      byokKey || undefined
+    );
 
     const cleanJson = rawJsonText
       .replace(/```json/gi, "")
@@ -81,9 +89,9 @@ Return ONLY a valid JSON array matching this exact schema with NO backticks and 
       topics: Array<string | { title: string; subtopics?: string[] }>;
     }> = JSON.parse(cleanJson);
 
-    // If userId and courseId are provided, atomically save modules & topics into Supabase
+    // Save ALL extracted modules & topics atomically to Supabase
     if (userId && courseId && modulesData.length > 0) {
-      // Find syllabus id for this course
+      // Find or create syllabus id for this course
       const { data: syllabus } = await supabaseServerAdmin
         .from("syllabi")
         .select("id")
@@ -110,7 +118,7 @@ Return ONLY a valid JSON array matching this exact schema with NO backticks and 
       }
 
       if (syllabusId) {
-        // Clear previous empty modules if re-uploading
+        // Clear previous modules to avoid duplicates
         const { data: existingMods } = await supabaseServerAdmin
           .from("syllabus_modules")
           .select("id")
@@ -122,7 +130,7 @@ Return ONLY a valid JSON array matching this exact schema with NO backticks and 
           await supabaseServerAdmin.from("syllabus_modules").delete().in("id", modIds);
         }
 
-        // Insert fresh modules and their topics
+        // Insert every extracted module and its topics
         for (let i = 0; i < modulesData.length; i++) {
           const mod = modulesData[i];
           const { data: insertedMod } = await supabaseServerAdmin
