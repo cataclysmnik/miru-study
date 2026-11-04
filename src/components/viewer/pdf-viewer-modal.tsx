@@ -95,9 +95,10 @@ export function PDFViewerModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={`flex flex-col p-0 gap-0 overflow-hidden border border-border bg-card shadow-2xl transition-all duration-200 ${
+        overlayClassName="bg-black/90 backdrop-blur-none"
+        className={`flex flex-col p-0 gap-0 overflow-hidden border border-border bg-card shadow-2xl transition-all duration-300 ease-out ${
           isFullscreen
-            ? "!w-[100vw] !max-w-none !h-[100vh] !rounded-none !top-0 !left-0 !translate-x-0 !translate-y-0"
+            ? "!w-screen !max-w-none !h-screen !rounded-none !top-0 !left-0 !translate-x-0 !translate-y-0"
             : "!w-[95vw] !max-w-[1300px] !h-[92vh] rounded-2xl"
         }`}
       >
@@ -123,7 +124,7 @@ export function PDFViewerModal({
               variant="outline"
               size="sm"
               onClick={() => setIsFullscreen((prev) => !prev)}
-              className="h-8 gap-1.5 text-xs border-border text-foreground hover:bg-muted"
+              className="h-8 gap-1.5 text-xs border-border text-foreground hover:bg-muted transition-colors cursor-pointer"
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
               {isFullscreen ? (
@@ -170,7 +171,7 @@ export function PDFViewerModal({
 
         {/* Native PDF Canvas Continuous Reader Area */}
         <div
-          className={`w-full relative overflow-hidden bg-card ${
+          className={`w-full relative overflow-hidden bg-card transition-all duration-300 ease-out ${
             isFullscreen ? "h-[calc(100vh-60px)]" : "h-[calc(92vh-60px)]"
           }`}
         >
