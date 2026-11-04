@@ -35,6 +35,7 @@ export function GlobalSearch() {
   const { resources } = useAI();
 
   const [isOpen, setIsOpen] = React.useState(false);
+  const [isClosing, setIsClosing] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const [mounted, setMounted] = React.useState(false);
@@ -51,44 +52,62 @@ export function GlobalSearch() {
     setMounted(true);
   }, []);
 
+  // Graceful close trigger with animation
+  const handleClose = React.useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsClosing(false);
+      setQuery("");
+      setSelectedIndex(0);
+    }, 180); // matches transition duration
+  }, []);
+
+  const handleOpen = React.useCallback(() => {
+    setIsClosing(false);
+    setIsOpen(true);
+  }, []);
+
   // Keyboard shortcut: Cmd+K / Ctrl+K
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setIsOpen((prev) => !prev);
+        if (isOpen) {
+          handleClose();
+        } else {
+          handleOpen();
+        }
       } else if (e.key === "Escape" && isOpen) {
-        setIsOpen(false);
+        e.preventDefault();
+        handleClose();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, handleClose, handleOpen]);
 
   // Focus input when dialog opens
   React.useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      setQuery("");
-      setSelectedIndex(0);
+    if (isOpen && !isClosing) {
+      setTimeout(() => inputRef.current?.focus(), 60);
     }
-  }, [isOpen]);
+  }, [isOpen, isClosing]);
 
   // Close when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
+        handleClose();
       }
     };
 
-    if (isOpen) {
+    if (isOpen && !isClosing) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, isClosing, handleClose]);
 
   // Aggregate and search across all academic entities
   const results = React.useMemo(() => {
@@ -195,10 +214,10 @@ export function GlobalSearch() {
                   setViewerTitle(mat.title || mat.fileName);
                   setViewerStoragePath(storagePath);
                   setViewerOpen(true);
-                  setIsOpen(false);
+                  handleClose();
                 } else {
                   router.push(`/courses/${c.id}?tab=materials`);
-                  setIsOpen(false);
+                  handleClose();
                 }
               },
             });
@@ -225,7 +244,7 @@ export function GlobalSearch() {
     });
 
     return matched.slice(0, 10);
-  }, [query, courses, resources, router]);
+  }, [query, courses, resources, router, handleClose]);
 
   // Handle Enter key and arrow navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -246,7 +265,7 @@ export function GlobalSearch() {
       item.onClick();
     } else if (item.url) {
       router.push(item.url);
-      setIsOpen(false);
+      handleClose();
     }
   };
 
@@ -275,7 +294,7 @@ export function GlobalSearch() {
         <input
           type="text"
           readOnly
-          onClick={() => setIsOpen(true)}
+          onClick={handleOpen}
           placeholder="Search courses, syllabi, notes, formula sheets..."
           className="h-10 w-full rounded-xl border border-border bg-background/50 pl-10 pr-12 text-xs font-normal text-foreground placeholder:text-muted-foreground/70 hover:border-primary/50 focus:outline-none transition-all cursor-pointer"
         />
@@ -291,16 +310,25 @@ export function GlobalSearch() {
         isOpen &&
         createPortal(
           <div className="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4 pointer-events-auto">
-            {/* Backdrop with Frosted Blur across entire window */}
+            {/* Backdrop with Frosted Blur with Smooth Fade In/Out */}
             <div
-              className="fixed inset-0 bg-stone-900/60 dark:bg-black/75 backdrop-blur-md transition-opacity"
-              onClick={() => setIsOpen(false)}
+              className={`fixed inset-0 bg-stone-900/60 dark:bg-black/75 backdrop-blur-md transition-opacity duration-200 ease-out ${
+                isClosing ? "opacity-0" : "opacity-100"
+              }`}
+              onClick={handleClose}
             />
 
-            {/* Search Palette Container */}
+            {/* Search Palette Container with Springy Scale & Fade Animation */}
             <div
               ref={containerRef}
-              className="relative z-10 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 duration-150"
+              className={`relative z-10 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col transition-all duration-200 ease-out ${
+                isClosing
+                  ? "opacity-0 scale-95 -translate-y-2"
+                  : "opacity-100 scale-100 translate-y-0"
+              }`}
+              style={{
+                animation: !isClosing ? "paletteEnter 200ms cubic-bezier(0.16, 1, 0.3, 1)" : undefined,
+              }}
             >
               {/* Input Header */}
               <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-card">
