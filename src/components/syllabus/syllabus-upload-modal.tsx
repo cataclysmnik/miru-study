@@ -200,3 +200,4 @@ export function SyllabusUploadModal({ courseId, courseName }: SyllabusUploadModa
     </Dialog>
   );
 }
+

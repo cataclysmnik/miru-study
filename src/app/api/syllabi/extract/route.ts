@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractDocumentText } from "@/lib/document-parser";
-import { GoogleGenAI } from "@google/genai";
-import OpenAI from "openai";
+import { callGemini } from "@/lib/gemini";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +9,6 @@ export async function POST(req: NextRequest) {
     const manualText = formData.get("text") as string | null;
     const courseName = formData.get("courseName") as string | null;
     const byokKey = formData.get("byokKey") as string | null;
-    const byokProvider = formData.get("byokProvider") as string | null;
 
     let extractedText = manualText || "";
 
@@ -27,11 +25,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // AI prompt to extract structured modules and topics JSON
     const extractionPrompt = `You are an expert academic curriculum parser. 
 Analyze the following syllabus text for the course "${courseName || "Academic Course"}" and extract a clean, structured hierarchical module and topic tree.
 
-Return ONLY a valid JSON array of modules matching this exact schema, with NO markdown backticks or commentary:
+Return ONLY a valid JSON array of modules matching this exact schema, with NO markdown backticks, NO markdown formatting, and NO commentary:
 [
   {
     "title": "Module 1: Title Here",
@@ -51,30 +48,14 @@ ${extractedText.slice(0, 15000)}
 `;
 
     let rawJsonText = "";
-
-    if (byokProvider === "gemini" && byokKey) {
-      const ai = new GoogleGenAI({ apiKey: byokKey });
-      const resp = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: extractionPrompt,
-      });
-      rawJsonText = resp.text || "[]";
-    } else if (byokProvider === "openai" && byokKey) {
-      const openai = new OpenAI({ apiKey: byokKey });
-      const resp = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: extractionPrompt }],
-      });
-      rawJsonText = resp.choices[0]?.message.content || "[]";
-    } else if (process.env.PLATFORM_AI_API_KEY) {
-      const ai = new GoogleGenAI({ apiKey: process.env.PLATFORM_AI_API_KEY });
-      const resp = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: extractionPrompt,
-      });
-      rawJsonText = resp.text || "[]";
-    } else {
-      // Fallback structural parsing if no AI key configured
+    try {
+      rawJsonText = await callGemini(
+        extractionPrompt,
+        "gemini-flash-latest",
+        byokKey || undefined
+      );
+    } catch (apiErr) {
+      console.warn("Gemini syllabus extraction fallback:", apiErr);
       const lines = extractedText.split("\n").filter((l) => l.trim().length > 0);
       const sampleModules = [
         {
@@ -87,8 +68,8 @@ ${extractedText.slice(0, 15000)}
           })),
         },
         {
-          title: "Module 2: Advanced Applications",
-          description: "Practical implementations and analysis",
+          title: "Module 2: Advanced Topics",
+          description: "Parsed syllabus units",
           hours: "12 Hours",
           topics: lines.slice(4, 8).map((line) => ({
             title: line.replace(/^[-*•0-9.]+\s*/, "").slice(0, 60),
@@ -99,8 +80,11 @@ ${extractedText.slice(0, 15000)}
       rawJsonText = JSON.stringify(sampleModules);
     }
 
-    // Clean JSON response
-    const cleanJson = rawJsonText.replace(/```json/g, "").replace(/```/g, "").trim();
+    const cleanJson = rawJsonText
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+
     const modules = JSON.parse(cleanJson);
 
     return NextResponse.json({
