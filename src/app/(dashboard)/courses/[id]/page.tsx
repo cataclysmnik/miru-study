@@ -12,8 +12,7 @@ import {
   Layers,
   GraduationCap,
   ArrowLeft,
-  CheckCircle2,
-  Clock,
+  UploadCloud,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAcademic } from "@/components/academic-provider";
 import { SyllabusTree } from "@/components/syllabus/syllabus-tree";
+import { SyllabusUploadModal } from "@/components/syllabus/syllabus-upload-modal";
 import { MaterialsManager } from "@/components/materials/materials-manager";
 import { CourseChatbot } from "@/components/ai/course-chatbot";
 
@@ -70,7 +70,7 @@ export default function CourseWorkspacePage() {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Badge variant="subtle" className="font-mono text-xs">
-                {course.code}
+                {course.code || "COURSE"}
               </Badge>
               <Badge variant="outline" className="text-xs">
                 {course.semesterName}
@@ -94,20 +94,26 @@ export default function CourseWorkspacePage() {
             )}
           </div>
 
-          {/* Quick syllabus completion meter */}
-          <div className="flex flex-col items-start sm:items-end gap-1.5 bg-card/60 border border-border p-3.5 rounded-xl">
+          {/* Quick Actions & Syllabus completion meter */}
+          <div className="flex flex-col items-start sm:items-end gap-2.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-foreground">
-                Syllabus Mastery
-              </span>
-              <span className="text-sm font-bold text-primary">
-                {course.progressPercent}%
+              <SyllabusUploadModal courseId={course.id} courseName={course.name} />
+            </div>
+
+            <div className="flex flex-col items-start sm:items-end gap-1.5 bg-card/60 border border-border p-3 rounded-xl w-full sm:w-auto">
+              <div className="flex items-center justify-between sm:justify-end gap-3 w-full">
+                <span className="text-xs font-semibold text-foreground">
+                  Syllabus Mastery
+                </span>
+                <span className="text-sm font-bold text-primary">
+                  {course.progressPercent}%
+                </span>
+              </div>
+              <Progress value={course.progressPercent} className="w-full sm:w-36 h-2" />
+              <span className="text-[10px] text-muted-foreground">
+                {completedTopics} of {allTopics.length} topics verified
               </span>
             </div>
-            <Progress value={course.progressPercent} className="w-36 h-2" />
-            <span className="text-[10px] text-muted-foreground">
-              {completedTopics} of {allTopics.length} topics verified
-            </span>
           </div>
         </div>
       </div>
@@ -140,7 +146,7 @@ export default function CourseWorkspacePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Course Objectives & Scope</CardTitle>
-              <CardDescription>{course.description}</CardDescription>
+              <CardDescription>{course.description || "No description provided."}</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-xl border border-border bg-background/50 space-y-1">
@@ -187,47 +193,63 @@ export default function CourseWorkspacePage() {
               <h3 className="text-sm font-semibold text-foreground">
                 Modules in this Course
               </h3>
-              <Button
-                variant="link"
-                size="sm"
-                className="text-xs text-primary"
-                onClick={() => handleTabChange("syllabus")}
-              >
-                Open Full Tree
-              </Button>
+              <div className="flex items-center gap-2">
+                <SyllabusUploadModal courseId={course.id} courseName={course.name} />
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="text-xs text-primary"
+                  onClick={() => handleTabChange("syllabus")}
+                >
+                  Open Full Tree
+                </Button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {course.syllabus.modules.map((m) => (
-                <div
-                  key={m.id}
-                  className="p-4 rounded-xl border border-border bg-card space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-xs text-foreground">
-                      {m.title}
+            {course.syllabus.modules.length === 0 ? (
+              <div className="p-8 text-center rounded-xl border border-dashed border-border bg-card/30 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  No syllabus modules yet. Upload your course syllabus document to begin!
+                </p>
+                <SyllabusUploadModal courseId={course.id} courseName={course.name} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {course.syllabus.modules.map((m) => (
+                  <div
+                    key={m.id}
+                    className="p-4 rounded-xl border border-border bg-card space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-foreground">
+                        {m.title}
+                      </span>
+                      {m.hoursOrWeightage && (
+                        <Badge variant="outline" className="text-[10px] py-0">
+                          {m.hoursOrWeightage}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground line-clamp-2">
+                      {m.description || "No module description."}
+                    </p>
+                    <span className="text-[10px] text-primary font-medium">
+                      {m.topics.length} topics mapped
                     </span>
-                    {m.hoursOrWeightage && (
-                      <Badge variant="outline" className="text-[10px] py-0">
-                        {m.hoursOrWeightage}
-                      </Badge>
-                    )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground line-clamp-2">
-                    {m.description || "No module description."}
-                  </p>
-                  <span className="text-[10px] text-primary font-medium">
-                    {m.topics.length} topics mapped
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </TabsContent>
 
         {/* Tab 2: Syllabus Tree */}
         <TabsContent value="syllabus" className="pt-2">
-          <SyllabusTree courseId={course.id} syllabus={course.syllabus} />
+          <SyllabusTree
+            courseId={course.id}
+            courseName={course.name}
+            syllabus={course.syllabus}
+          />
         </TabsContent>
 
         {/* Tab 3: Materials Manager */}
@@ -255,33 +277,17 @@ export default function CourseWorkspacePage() {
                     Generated MCQs, short answers, and flashcards derived from {course.code} materials.
                   </CardDescription>
                 </div>
-                <Button size="sm" className="gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5" /> Generate Questions
-                </Button>
+                <Link href="/ai-studio">
+                  <Button size="sm" className="gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" /> Generate Questions
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="p-4 rounded-xl border border-border bg-card space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-[10px]">
-                    MCQ • Dynamic Programming
-                  </Badge>
-                  <Badge variant="matcha" className="text-[10px]">
-                    Verified Source
-                  </Badge>
-                </div>
-                <p className="text-xs font-semibold text-foreground">
-                  What gives the 0/1 Knapsack problem dynamic programming approach a pseudo-polynomial time complexity rather than strictly polynomial?
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
-                  <div className="p-2 rounded-lg border border-primary/50 bg-primary/10 text-primary font-medium">
-                    A) Running time depends on numeric magnitude of capacity W, not binary input length. (Correct)
-                  </div>
-                  <div className="p-2 rounded-lg border border-border bg-background/50 text-muted-foreground">
-                    B) Sorting items requires exponential space.
-                  </div>
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Visit the AI Studio to generate question sets or practice flashcards for {course.name}.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -296,24 +302,30 @@ export default function CourseWorkspacePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {course.syllabus.modules.map((m) => {
-                const comp = m.topics.filter((t) => t.status === "completed").length;
-                const pct =
-                  m.topics.length > 0 ? Math.round((comp / m.topics.length) * 100) : 0;
+              {course.syllabus.modules.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Upload or add syllabus modules to view mastery breakdown.
+                </p>
+              ) : (
+                course.syllabus.modules.map((m) => {
+                  const comp = m.topics.filter((t) => t.status === "completed").length;
+                  const pct =
+                    m.topics.length > 0 ? Math.round((comp / m.topics.length) * 100) : 0;
 
-                return (
-                  <div key={m.id} className="space-y-1.5 p-3 rounded-xl border border-border bg-background/40">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-foreground">{m.title}</span>
-                      <span className="font-semibold text-primary">{pct}%</span>
+                  return (
+                    <div key={m.id} className="space-y-1.5 p-3 rounded-xl border border-border bg-background/40">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-semibold text-foreground">{m.title}</span>
+                        <span className="font-semibold text-primary">{pct}%</span>
+                      </div>
+                      <Progress value={pct} className="h-1.5" />
+                      <span className="text-[10px] text-muted-foreground">
+                        {comp} of {m.topics.length} topics verified
+                      </span>
                     </div>
-                    <Progress value={pct} className="h-1.5" />
-                    <span className="text-[10px] text-muted-foreground">
-                      {comp} of {m.topics.length} topics verified
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -321,4 +333,3 @@ export default function CourseWorkspacePage() {
     </div>
   );
 }
-
