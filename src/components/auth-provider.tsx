@@ -4,7 +4,7 @@ import * as React from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   email: string;
   fullName: string;
@@ -21,48 +21,65 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-const defaultProfile: UserProfile = {
-  id: "student-local-demo",
-  email: "student@miru.study",
-  fullName: "Aoi Takahashi",
-  academicRole: "Undergraduate Student",
-  institution: "Faculty of Computer Science",
-  avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-};
-
 const AuthContext = React.createContext<AuthContextType>({
   user: null,
-  profile: defaultProfile,
-  isLoading: false,
+  profile: null,
+  isLoading: true,
   signInWithGoogle: async () => {},
   signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
-  const [profile, setProfile] = React.useState<UserProfile | null>(defaultProfile);
+  const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
+  // Fetch real profile from Supabase database
+  const fetchProfile = async (currentUser: User) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
+
+      if (data && !error) {
+        setProfile({
+          id: data.id,
+          email: data.email,
+          fullName: data.full_name || currentUser.email?.split("@")[0] || "Student",
+          academicRole: data.academic_role || "Student",
+          avatarUrl: data.avatar_url,
+          institution: data.institution,
+        });
+      } else {
+        // Fallback to user metadata if profile row pending
+        setProfile({
+          id: currentUser.id,
+          email: currentUser.email || "",
+          fullName: currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "Student",
+          academicRole: "Student",
+          avatarUrl: currentUser.user_metadata?.avatar_url,
+        });
+      }
+    } catch (e) {
+      console.error("Profile fetch error:", e);
+    }
+  };
+
   React.useEffect(() => {
-    // Check active session if Supabase is properly configured
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setUser(session.user);
-          setProfile({
-            id: session.user.id,
-            email: session.user.email || "student@miru.study",
-            fullName: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Miru Scholar",
-            academicRole: "Student",
-            avatarUrl: session.user.user_metadata?.avatar_url,
-          });
+          await fetchProfile(session.user);
         } else {
-          // In local workspace development without cloud secrets, use local wabi-sabi demo profile
-          setProfile(defaultProfile);
+          setUser(null);
+          setProfile(null);
         }
       } catch (e) {
-        setProfile(defaultProfile);
+        console.error("Session check error:", e);
       } finally {
         setIsLoading(false);
       }
@@ -70,16 +87,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user);
-        setProfile({
-          id: session.user.id,
-          email: session.user.email || "student@miru.study",
-          fullName: session.user.user_metadata?.full_name || "Miru Scholar",
-          academicRole: "Student",
-          avatarUrl: session.user.user_metadata?.avatar_url,
-        });
+        await fetchProfile(session.user);
+      } else {
+        setUser(null);
+        setProfile(null);
       }
     });
 
@@ -100,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setProfile(null);
   };
 
   return (
@@ -112,4 +127,3 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return React.useContext(AuthContext);
 }
-

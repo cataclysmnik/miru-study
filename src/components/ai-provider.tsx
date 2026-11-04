@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import { GeneratedResourceItem, GenerationResourceType, AIProviderConfig } from "@/types/ai";
-import { INITIAL_GENERATED_RESOURCES } from "@/lib/mock-resources";
+import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/components/auth-provider";
 
 interface AIContextType {
   resources: GeneratedResourceItem[];
+  isLoading: boolean;
   providerConfig: AIProviderConfig;
   setProviderConfig: (config: AIProviderConfig) => void;
   saveBYOKKey: (provider: "gemini" | "openai", key: string, model: string) => void;
@@ -20,14 +22,15 @@ interface AIContextType {
     resourceType: GenerationResourceType;
     customPrompt?: string;
   }) => Promise<GeneratedResourceItem>;
+  refreshResources: () => Promise<void>;
 }
 
 const AIContext = React.createContext<AIContextType | null>(null);
 
 export function AIProvider({ children }: { children: React.ReactNode }) {
-  const [resources, setResources] = React.useState<GeneratedResourceItem[]>(
-    INITIAL_GENERATED_RESOURCES
-  );
+  const { user } = useAuth();
+  const [resources, setResources] = React.useState<GeneratedResourceItem[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   const [providerConfig, setProviderConfig] = React.useState<AIProviderConfig>({
     provider: "platform",
@@ -36,8 +39,66 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     hasKey: false,
   });
 
+  const [storedBYOKKey, setStoredBYOKKey] = React.useState<string>("");
+
+  // Load real resources from Supabase
+  const loadResources = async () => {
+    if (!user) {
+      setResources([]);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("resources")
+        .select(`
+          id,
+          course_id,
+          module_id,
+          topic_id,
+          title,
+          resource_type,
+          content_markdown,
+          citations,
+          created_at,
+          is_favorite,
+          courses (
+            code
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (data) {
+        const mapped: GeneratedResourceItem[] = data.map((r: any) => ({
+          id: r.id,
+          courseId: r.course_id,
+          courseCode: r.courses?.code || "COURSE",
+          moduleId: r.module_id,
+          topicId: r.topic_id,
+          title: r.title,
+          resourceType: r.resource_type,
+          contentMarkdown: r.content_markdown || "",
+          citations: r.citations || [],
+          createdAt: new Date(r.created_at).toLocaleDateString(),
+          isFavorite: r.is_favorite,
+        }));
+        setResources(mapped);
+      }
+    } catch (e) {
+      console.error("Error loading resources from database:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadResources();
+  }, [user]);
+
   const saveBYOKKey = (provider: "gemini" | "openai", key: string, model: string) => {
-    // In local client state, register key usage flag (never logged or exposed)
+    setStoredBYOKKey(key);
     setProviderConfig({
       provider,
       model,
@@ -47,6 +108,7 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeBYOKKey = () => {
+    setStoredBYOKKey("");
     setProviderConfig({
       provider: "platform",
       model: "gemini-1.5-flash",
@@ -65,72 +127,69 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     resourceType: GenerationResourceType;
     customPrompt?: string;
   }): Promise<GeneratedResourceItem> => {
-    // Simulate grounded generation pipeline
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    // 1. Call real generation route
+    const res = await fetch("/api/ai/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        courseId: params.courseId,
+        courseCode: params.courseCode,
+        moduleId: params.moduleId,
+        topicName: params.topicName || params.moduleName,
+        resourceType: params.resourceType,
+        customPrompt: params.customPrompt,
+        byokProvider: providerConfig.isBYOK ? providerConfig.provider : undefined,
+        byokKey: providerConfig.isBYOK ? storedBYOKKey : undefined,
+        byokModel: providerConfig.isBYOK ? providerConfig.model : undefined,
+        userId: user?.id,
+      }),
+    });
 
-    const titlePrefix: Record<GenerationResourceType, string> = {
-      detailed_notes: "Comprehensive Study Notes",
-      revision_notes: "High-Yield Revision Brief",
-      exam_notes: "Exam Preparation Digest",
-      summary: "Executive Syllabus Summary",
-      mcq_quiz: "Targeted MCQ Mastery Set",
-      flashcards: "Key Definitions & Invariants Flashcards",
-      cheat_sheet: "Quick Reference Cheat Sheet",
-      formula_sheet: "Essential Equations & Complexity Bounds",
-    };
+    const data = await res.json();
 
-    const targetTopic = params.topicName || params.moduleName || "Course Scope";
-    const title = `${titlePrefix[params.resourceType]} — ${targetTopic}`;
+    if (!res.ok) {
+      throw new Error(data.error || "Generation failed");
+    }
+
+    // 2. Persist real resource to Supabase resources table
+    let savedId = `res-${Date.now()}`;
+    if (user) {
+      try {
+        const { data: insertedRecord } = await supabase
+          .from("resources")
+          .insert({
+            user_id: user.id,
+            course_id: params.courseId,
+            module_id: params.moduleId && params.moduleId !== "all" ? params.moduleId : null,
+            topic_id: params.topicId && params.topicId !== "all" ? params.topicId : null,
+            title: data.title,
+            resource_type: params.resourceType,
+            content_markdown: data.contentMarkdown,
+            citations: data.citations || [],
+          })
+          .select("id")
+          .single();
+
+        if (insertedRecord) {
+          savedId = insertedRecord.id;
+        }
+      } catch (err) {
+        console.error("Error saving resource to database:", err);
+      }
+    }
 
     const newRes: GeneratedResourceItem = {
-      id: `gen-${Date.now()}`,
+      id: savedId,
       courseId: params.courseId,
       courseCode: params.courseCode,
       moduleId: params.moduleId,
       moduleName: params.moduleName,
       topicId: params.topicId,
       topicName: params.topicName,
-      title,
+      title: data.title,
       resourceType: params.resourceType,
-      contentMarkdown: `# ${title}
-
-## Scope & Syllabus Context
-- **Course**: ${params.courseCode}
-- **Module**: ${params.moduleName || "General Course"}
-- **Specific Topic**: ${targetTopic}
-
----
-
-## 1. Core Principles & Theoretical Grounding
-Based on your uploaded course slides and textbook chapters, this unit examines the foundational properties of **${targetTopic}**. 
-
-1. **Key Concept**: The primary objective is establishing optimal sub-structure and maintaining consistency invariants across states.
-2. **Analytical Rigor**: Every transition adheres to mathematical recurrence constraints verified in your curriculum.
-
----
-
-## 2. In-Depth Technical Breakdown
-\`\`\`text
-[Input Scope] -> [State Definition] -> [Transition Function] -> [Validated Output]
-\`\`\`
-
-- **Primary Formulation**:
-  $$f(x) = \\sum_{i=1}^k w_i \\cdot \\phi(s_i)$$
-
-- **Practical Implication**: When revising for your upcoming examination, focus especially on trade-offs between asymptotic efficiency and memory footprint.
-
----
-
-## 3. Grounded Academic Citations
-The above analysis was synthesized directly from your uploaded materials for **${params.courseCode}**.
-`,
-      citations: [
-        {
-          title: `${params.courseCode} Official Lecture Documents`,
-          page: 12,
-          excerpt: `Verified grounding against ${targetTopic} in syllabus.`,
-        },
-      ],
+      contentMarkdown: data.contentMarkdown,
+      citations: data.citations || [],
       createdAt: "Just now",
       isFavorite: false,
     };
@@ -143,11 +202,13 @@ The above analysis was synthesized directly from your uploaded materials for **$
     <AIContext.Provider
       value={{
         resources,
+        isLoading,
         providerConfig,
         setProviderConfig,
         saveBYOKKey,
         removeBYOKKey,
         generateResource,
+        refreshResources: loadResources,
       }}
     >
       {children}
@@ -160,4 +221,3 @@ export function useAI() {
   if (!ctx) throw new Error("useAI must be used within an AIProvider");
   return ctx;
 }
-

@@ -9,3 +9,4 @@ export const supabaseServerAdmin = createClient(supabaseUrl, supabaseServiceKey,
     autoRefreshToken: false,
   },
 });
+

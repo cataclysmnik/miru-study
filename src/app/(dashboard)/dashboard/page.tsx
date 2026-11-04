@@ -14,16 +14,20 @@ import {
   CheckCircle2,
   FileText,
   Bookmark,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth-provider";
-import { ACTIVE_COURSES, UPCOMING_TASKS, RECENT_RESOURCES } from "@/lib/mock-academic-data";
+import { useAcademic } from "@/components/academic-provider";
+import { useAI } from "@/components/ai-provider";
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const { courses, activeSemester, isLoading: academicLoading } = useAcademic();
+  const { resources, isLoading: aiLoading } = useAI();
 
   return (
     <div className="space-y-10 pb-12">
@@ -37,7 +41,7 @@ export default function DashboardPage() {
             Good morning, {profile?.fullName?.split(" ")[0] || "Scholar"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-            Spring Semester is 62% in progress. Focus today on your scheduled algorithm topics or review generated flashcards.
+            {activeSemester?.name || "Current Academic Workspace"} is active. Focus on your syllabus modules or review your generated notes.
           </p>
         </div>
 
@@ -64,7 +68,7 @@ export default function DashboardPage() {
           { label: "Upload Material", icon: FileUp, href: "/courses" },
           { label: "Add Syllabus", icon: BookOpen, href: "/courses" },
           { label: "AI Studio", icon: Sparkles, href: "/ai-studio" },
-          { label: "Practice Quiz", icon: HelpCircle, href: "/resources" },
+          { label: "Resource Library", icon: HelpCircle, href: "/resources" },
           { label: "Study Planner", icon: CalendarCheck2, href: "/planner" },
         ].map((action, i) => {
           const Icon = action.icon;
@@ -93,7 +97,7 @@ export default function DashboardPage() {
                 Active Courses
               </h2>
               <p className="text-xs text-muted-foreground">
-                Syllabus progress based on verified module topics
+                Live courses linked to your Supabase academic workspace
               </p>
             </div>
             <Link href="/courses" className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
@@ -101,145 +105,141 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {ACTIVE_COURSES.map((course) => (
-              <Card key={course.id} className="group hover:border-primary/40 transition-all">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="subtle" className="font-mono text-[10px]">
-                      {course.code}
-                    </Badge>
-                    <span className="text-xs font-semibold text-primary">
-                      {course.progressPercent}%
-                    </span>
-                  </div>
-                  <CardTitle className="text-base group-hover:text-primary transition-colors mt-2">
-                    {course.name}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-1">
-                    {course.instructor}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] text-muted-foreground">
-                      <span>Syllabus Covered</span>
-                      <span>
-                        {course.completedModules} of {course.totalModules} modules
+          {courses.length === 0 ? (
+            <div className="p-8 text-center rounded-xl border border-dashed border-border bg-card/40 space-y-3">
+              <BookOpen className="h-8 w-8 text-muted-foreground mx-auto" />
+              <h4 className="text-sm font-semibold text-foreground">No courses created yet</h4>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Create your first academic course in the Courses Hub to begin uploading syllabi and study materials.
+              </p>
+              <Link href="/courses">
+                <Button size="sm" className="mt-2">
+                  Create First Course
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {courses.map((course) => (
+                <Card key={course.id} className="group hover:border-primary/40 transition-all">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="subtle" className="font-mono text-[10px]">
+                        {course.code || "COURSE"}
+                      </Badge>
+                      <span className="text-xs font-semibold text-primary">
+                        {course.progressPercent}%
                       </span>
                     </div>
-                    <Progress value={course.progressPercent} className="h-1.5" />
-                  </div>
-                  <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
-                    <Link
-                      href={`/courses/${course.id}`}
-                      className="font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
-                    >
-                      Workspace <ArrowRight className="h-3 w-3" />
-                    </Link>
-                    <Link
-                      href={`/courses/${course.id}?tab=ai-studio`}
-                      className="text-primary hover:underline flex items-center gap-1 font-medium"
-                    >
-                      <Sparkles className="h-3 w-3" /> Chatbot
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <CardTitle className="text-base group-hover:text-primary transition-colors mt-2">
+                      {course.name}
+                    </CardTitle>
+                    <CardDescription className="line-clamp-1">
+                      {course.instructorName || "No instructor assigned"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>Syllabus Covered</span>
+                        <span>
+                          {course.syllabus.modules.length} modules
+                        </span>
+                      </div>
+                      <Progress value={course.progressPercent} className="h-1.5" />
+                    </div>
+                    <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                      <Link
+                        href={`/courses/${course.id}`}
+                        className="font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      >
+                        Workspace <ArrowRight className="h-3 w-3" />
+                      </Link>
+                      <Link
+                        href={`/courses/${course.id}?tab=ai-studio`}
+                        className="text-primary hover:underline flex items-center gap-1 font-medium"
+                      >
+                        <Sparkles className="h-3 w-3" /> Chatbot
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {/* Recently Generated Academic Resources */}
           <div className="pt-4 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold tracking-tight text-foreground">
-                Recent Resources
+                Your Academic Resources ({resources.length})
               </h2>
               <Link href="/resources" className="text-xs font-medium text-primary hover:underline">
                 Resource Library
               </Link>
             </div>
 
-            <div className="space-y-2.5">
-              {RECENT_RESOURCES.map((res) => (
-                <div
-                  key={res.id}
-                  className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-card hover:border-border/80 transition-all text-xs"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground">{res.title}</span>
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-                          {res.courseCode}
-                        </Badge>
+            {resources.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted-foreground border border-border rounded-xl bg-card/30">
+                No resources generated yet. Visit the AI Studio to synthesize your first notes!
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {resources.slice(0, 4).map((res) => (
+                  <div
+                    key={res.id}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-card hover:border-border/80 transition-all text-xs"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+                        <FileText className="h-4 w-4" />
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground text-[11px] mt-0.5">
-                        <span>{res.type}</span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> {res.updatedAt}
-                        </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">{res.title}</span>
+                          <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                            {res.courseCode}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground text-[11px] mt-0.5">
+                          <span>{res.resourceType.replace("_", " ")}</span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> {res.createdAt}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/resources/${res.id}`}>Open</Link>
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/resources/${res.id}`}>Open</Link>
-                  </Button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right 1 Col: Upcoming Deadlines & Mindful Habits */}
+        {/* Right 1 Col: Mindful Academic Focus */}
         <div className="space-y-6">
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Study Schedule</CardTitle>
-                <Link href="/planner" className="text-xs font-medium text-primary hover:underline">
-                  Planner
-                </Link>
-              </div>
-              <CardDescription>Targeted syllabus milestones</CardDescription>
+              <CardTitle className="text-base">Workspace Statistics</CardTitle>
+              <CardDescription>Live database counts</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {UPCOMING_TASKS.map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-start gap-3 p-3 rounded-lg border border-border/70 bg-background/50 text-xs"
-                >
-                  <div className="pt-0.5">
-                    {task.isCompleted ? (
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                    ) : (
-                      <div className="h-4 w-4 rounded-full border border-muted-foreground/60" />
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Badge
-                        variant={task.isExam ? "destructive" : "secondary"}
-                        className="text-[9px] py-0 px-1.5 font-mono"
-                      >
-                        {task.courseCode}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground">{task.dueDate}</span>
-                    </div>
-                    <p
-                      className={`text-xs font-medium ${
-                        task.isCompleted ? "line-through text-muted-foreground" : "text-foreground"
-                      }`}
-                    >
-                      {task.title}
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <CardContent className="space-y-3 text-xs">
+              <div className="flex justify-between items-center p-2.5 rounded-lg bg-background/50 border border-border/60">
+                <span className="text-muted-foreground">Active Courses:</span>
+                <span className="font-bold text-foreground">{courses.length}</span>
+              </div>
+              <div className="flex justify-between items-center p-2.5 rounded-lg bg-background/50 border border-border/60">
+                <span className="text-muted-foreground">Saved Resources:</span>
+                <span className="font-bold text-foreground">{resources.length}</span>
+              </div>
+              <div className="flex justify-between items-center p-2.5 rounded-lg bg-background/50 border border-border/60">
+                <span className="text-muted-foreground">Active Term:</span>
+                <span className="font-semibold text-primary">{activeSemester?.name || "Term"}</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -258,4 +258,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
