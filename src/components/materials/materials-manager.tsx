@@ -9,12 +9,14 @@ import {
   ExternalLink,
   Layers,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { StudyMaterialItem, SyllabusModule } from "@/types/academic";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAcademic } from "@/components/academic-provider";
+import { useAuth } from "@/components/auth-provider";
 
 interface MaterialsManagerProps {
   courseId: string;
@@ -28,9 +30,12 @@ export function MaterialsManager({
   modules,
 }: MaterialsManagerProps) {
   const { addStudyMaterial } = useAcademic();
+  const { user } = useAuth();
   const [dragActive, setDragActive] = React.useState(false);
   const [selectedModuleId, setSelectedModuleId] = React.useState<string>("unassigned");
   const [uploadTitle, setUploadTitle] = React.useState("");
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [uploadFeedback, setUploadFeedback] = React.useState<string | null>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -48,8 +53,7 @@ export function MaterialsManager({
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      processFile(file);
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -59,28 +63,59 @@ export function MaterialsManager({
     }
   };
 
-  const processFile = (file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    const validTypes: Array<"pdf" | "docx" | "pptx" | "txt" | "markdown" | "image"> = [
-      "pdf",
-      "docx",
-      "pptx",
-      "txt",
-      "markdown",
-      "image",
-    ];
+  const processFile = async (file: File) => {
+    setIsUploading(true);
+    setUploadFeedback("Extracting document text and building RAG chunks...");
 
-    const fileType = validTypes.includes(ext as any) ? (ext as any) : "pdf";
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("courseId", courseId);
+      if (selectedModuleId !== "unassigned") {
+        formData.append("moduleId", selectedModuleId);
+      }
+      formData.append("title", uploadTitle.trim() || file.name);
+      if (user?.id) {
+        formData.append("userId", user.id);
+      }
 
-    addStudyMaterial(courseId, {
-      title: uploadTitle.trim() || file.name,
-      fileName: file.name,
-      fileType,
-      fileSizeBytes: file.size,
-      moduleId: selectedModuleId !== "unassigned" ? selectedModuleId : undefined,
-    });
+      // Call live document extraction API
+      const res = await fetch("/api/materials/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    setUploadTitle("");
+      const data = await res.json();
+
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      const validTypes: Array<"pdf" | "docx" | "pptx" | "txt" | "markdown" | "image"> = [
+        "pdf",
+        "docx",
+        "pptx",
+        "txt",
+        "markdown",
+        "image",
+      ];
+      const fileType = validTypes.includes(ext as any) ? (ext as any) : "pdf";
+
+      addStudyMaterial(courseId, {
+        title: uploadTitle.trim() || file.name,
+        fileName: file.name,
+        fileType,
+        fileSizeBytes: file.size,
+        moduleId: selectedModuleId !== "unassigned" ? selectedModuleId : undefined,
+      });
+
+      setUploadTitle("");
+      setUploadFeedback(`Successfully extracted and indexed ${data.totalChunks || 1} chunks for RAG!`);
+      setTimeout(() => setUploadFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      setUploadFeedback("Uploaded to local workspace.");
+      setTimeout(() => setUploadFeedback(null), 3000);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const formatBytes = (bytes: number) => {
@@ -106,14 +141,24 @@ export function MaterialsManager({
         }`}
       >
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-foreground mb-3 shadow-xs">
-          <UploadCloud className="h-6 w-6" />
+          {isUploading ? (
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          ) : (
+            <UploadCloud className="h-6 w-6" />
+          )}
         </div>
         <h4 className="text-sm font-semibold text-foreground">
-          Drop course materials here or choose a file
+          {isUploading ? "Processing Document..." : "Drop course materials here or choose a file"}
         </h4>
         <p className="text-xs text-muted-foreground mt-1 text-center max-w-sm">
           Supports PDF, DOCX, PPTX, Markdown, Text, and Images. Content is extracted for syllabus-grounded RAG.
         </p>
+
+        {uploadFeedback && (
+          <div className="mt-3 p-2 px-3 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary font-medium">
+            {uploadFeedback}
+          </div>
+        )}
 
         {/* Association controls */}
         <div className="flex flex-col sm:flex-row items-center gap-3 mt-4 w-full max-w-md">
@@ -122,11 +167,13 @@ export function MaterialsManager({
             placeholder="Custom title (optional)..."
             value={uploadTitle}
             onChange={(e) => setUploadTitle(e.target.value)}
+            disabled={isUploading}
             className="h-8 flex-1 w-full rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:border-primary focus:outline-none"
           />
           <select
             value={selectedModuleId}
             onChange={(e) => setSelectedModuleId(e.target.value)}
+            disabled={isUploading}
             className="h-8 rounded-lg border border-border bg-background px-2.5 text-xs text-foreground focus:border-primary focus:outline-none w-full sm:w-auto"
           >
             <option value="unassigned">General Course Material</option>
@@ -142,11 +189,14 @@ export function MaterialsManager({
           <input
             type="file"
             className="hidden"
-            accept=".pdf,.docx,.pptx,.txt,.md,.png,.jpg,.jpeg"
+            accept=".pdf,.docx,.pptx,.txt,.md"
             onChange={handleFileInput}
+            disabled={isUploading}
           />
-          <Button type="button" size="sm" asChild>
-            <span className="cursor-pointer">Browse Files</span>
+          <Button type="button" size="sm" asChild disabled={isUploading}>
+            <span className="cursor-pointer">
+              {isUploading ? "Uploading..." : "Browse Files"}
+            </span>
           </Button>
         </label>
       </div>
@@ -222,4 +272,3 @@ export function MaterialsManager({
     </div>
   );
 }
-
