@@ -14,67 +14,66 @@ export async function POST(req: NextRequest) {
     const byokKey = formData.get("byokKey") as string | null;
 
     let extractedText = manualText || "";
+    let inlineFile: { mimeType: string; data: string } | undefined = undefined;
 
     if (file) {
       const buffer = Buffer.from(await file.arrayBuffer());
+
+      // If PDF, pass both native inline PDF bytes to Gemini multimodal AND extracted text
+      if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+        inlineFile = {
+          mimeType: "application/pdf",
+          data: buffer.toString("base64"),
+        };
+      }
+
       const extracted = await extractDocumentText(buffer, file.name);
       extractedText = extracted.text;
     }
 
-    if (!extractedText.trim()) {
+    if (!extractedText.trim() && !inlineFile) {
       return NextResponse.json(
         { error: "No text or file provided for syllabus extraction" },
         { status: 400 }
       );
     }
 
-    // Force extraction of ALL modules without early stopping
-    const extractionPrompt = `You are an expert academic curriculum parser.
-Analyze this official syllabus document for "${courseName || "Academic Course"}":
+    const extractionPrompt = `You are a precision academic curriculum parser.
+Examine this complete course syllabus document for "${courseName || "Academic Course"}".
 
---- FULL SYLLABUS TEXT ---
-${extractedText.slice(0, 35000)}
---------------------------
+INSTRUCTIONS:
+1. Scan the ENTIRE document from start to end (especially looking across all pages, tables, and sections like Module 1, Module 2, Module 3, Module 4, Module 5, Module 6, Module 7, Module 8, etc.).
+2. You must NOT stop early or truncate the end. Capture EVERY module listed in the curriculum table.
+3. For each module, extract:
+   - "title": Clean title (e.g. "Module 1: Introduction to Autonomous Drones")
+   - "hours": The hours or weightage if stated (e.g. "4 hours", "3 hours", "5 hours", "2 hours")
+   - "topics": An array of individual topics. Break down comma-separated or dash-separated phrases into distinct topics.
+   - "description": Brief 1-line concept summary.
 
-CRITICAL REQUIREMENTS:
-1. You MUST extract EVERY SINGLE MODULE present in the syllabus (e.g. Module 1, Module 2, Module 3, Module 4, Module 5, Module 6, Module 7, Module 8, etc.). Do NOT omit or truncate any modules.
-2. For each module, break apart its text into discrete constituent topics (split by dashes, commas, bullets, or semicolons).
-3. Extract the lecture hours / weightage if stated (e.g. "4 hours", "3 hours", "5 hours").
-
-Return ONLY a valid JSON array of ALL modules matching this exact schema, with NO markdown backticks and NO other text:
+Return a pure JSON array with no extra text or markdown formatting:
 [
   {
     "title": "Module 1: Introduction to Autonomous Drones",
-    "description": "Foundations and component overview",
     "hours": "4 hours",
-    "topics": [
-      "History of Drones",
-      "Types of drones",
-      "Airframe",
-      "Batteries",
-      "Motors",
-      "ESC: Electronic Speed Controller",
-      "Propellers"
-    ]
-  },
-  {
-    "title": "Module 2: Design Fundamentals",
-    "description": "Controllers and transmission systems",
-    "hours": "3 hours",
-    "topics": [
-      "Flight Controllers",
-      "RC Transmitters",
-      "FPV Systems",
-      "Telemetry",
-      "Timing Gates"
-    ]
+    "description": "Foundations and component overview",
+    "topics": ["History of Drones", "Types of drones", "Airframe", "Batteries", "Motors", "ESC: Electronic Speed Controller", "Propellers"]
   }
-]`;
+]
+
+Extracted text reference (if applicable):
+${extractedText.slice(0, 50000)}
+`;
 
     const rawJsonText = await callGemini(
       extractionPrompt,
       "gemini-flash-latest",
-      byokKey || undefined
+      byokKey || undefined,
+      {
+        maxOutputTokens: 8192,
+        temperature: 0.1,
+        responseMimeType: "application/json",
+      },
+      inlineFile
     );
 
     const cleanJson = rawJsonText
@@ -89,9 +88,8 @@ Return ONLY a valid JSON array of ALL modules matching this exact schema, with N
       topics: Array<string | { title: string; subtopics?: string[] }>;
     }> = JSON.parse(cleanJson);
 
-    // Save ALL extracted modules & topics atomically to Supabase
+    // Save ALL extracted modules & topics atomically into Supabase
     if (userId && courseId && modulesData.length > 0) {
-      // Find or create syllabus id for this course
       const { data: syllabus } = await supabaseServerAdmin
         .from("syllabi")
         .select("id")
@@ -130,7 +128,7 @@ Return ONLY a valid JSON array of ALL modules matching this exact schema, with N
           await supabaseServerAdmin.from("syllabus_modules").delete().in("id", modIds);
         }
 
-        // Insert every extracted module and its topics
+        // Insert every extracted module and all its constituent topics
         for (let i = 0; i < modulesData.length; i++) {
           const mod = modulesData[i];
           const { data: insertedMod } = await supabaseServerAdmin

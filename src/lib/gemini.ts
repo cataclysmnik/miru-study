@@ -1,5 +1,9 @@
 export interface GeminiMessagePart {
-  text: string;
+  text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string; // base64
+  };
 }
 
 export interface GeminiContent {
@@ -7,7 +11,6 @@ export interface GeminiContent {
   role?: "user" | "model";
 }
 
-// Order of model attempts (auto-failover in case Google servers experience temporary 503 load spikes)
 const MODEL_PRIORITY = [
   "gemini-flash-latest",
   "gemini-flash-lite-latest",
@@ -18,7 +21,16 @@ const MODEL_PRIORITY = [
 export async function callGemini(
   prompt: string,
   preferredModel: string = "gemini-flash-latest",
-  customKey?: string
+  customKey?: string,
+  generationConfig?: {
+    maxOutputTokens?: number;
+    temperature?: number;
+    responseMimeType?: string;
+  },
+  inlineFile?: {
+    mimeType: string;
+    data: string; // base64
+  }
 ): Promise<string> {
   const apiKey =
     customKey ||
@@ -37,6 +49,29 @@ export async function callGemini(
 
   let lastError = "";
 
+  const parts: any[] = [{ text: prompt }];
+  if (inlineFile) {
+    parts.unshift({
+      inline_data: {
+        mime_type: inlineFile.mimeType,
+        data: inlineFile.data,
+      },
+    });
+  }
+
+  const requestBody: any = {
+    contents: [
+      {
+        parts,
+      },
+    ],
+    generationConfig: {
+      maxOutputTokens: generationConfig?.maxOutputTokens || 8192,
+      temperature: generationConfig?.temperature ?? 0.1,
+      ...(generationConfig?.responseMimeType ? { responseMimeType: generationConfig.responseMimeType } : {}),
+    },
+  };
+
   for (const model of modelsToTry) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -47,24 +82,13 @@ export async function callGemini(
           "Content-Type": "application/json",
           "X-goog-api-key": apiKey,
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.warn(`Gemini (${model}) returned status ${response.status}:`, errorText);
         lastError = errorText;
-        // If 503 or 404, try next model in pool
         if (response.status === 503 || response.status === 404) {
           continue;
         }
