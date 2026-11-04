@@ -6,11 +6,6 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Maximize2,
-  ZoomIn,
-  ZoomOut,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
 } from "lucide-react";
 import {
@@ -25,8 +20,8 @@ interface PDFViewerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  pdfUrl?: string; // direct url or blob url
-  storagePath?: string; // Supabase storage path to generate signed URL
+  pdfUrl?: string;
+  storagePath?: string;
 }
 
 export function PDFViewerModal({
@@ -73,10 +68,10 @@ export function PDFViewerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-border bg-card shadow-2xl">
+      <DialogContent className="!w-[94vw] !max-w-[1300px] !h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-border bg-card shadow-2xl">
         {/* Viewer Header Toolbar */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-card/90 select-none">
-          <div className="flex items-center gap-2.5 truncate pr-4">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-card/95 select-none shrink-0">
+          <div className="flex items-center gap-2.5 truncate pr-8">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary shrink-0">
               <FileText className="h-4 w-4" />
             </div>
@@ -90,7 +85,7 @@ export function PDFViewerModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 mr-8">
             {activeUrl && (
               <>
                 <Button
@@ -120,12 +115,12 @@ export function PDFViewerModal({
           </div>
         </div>
 
-        {/* Viewer Main Body */}
-        <div className="flex-1 w-full h-full bg-muted/40 relative flex items-center justify-center">
+        {/* Viewer Main Frame */}
+        <div className="flex-1 w-full h-[calc(90vh-60px)] bg-muted/30 relative flex items-center justify-center overflow-hidden">
           {isLoading ? (
             <div className="flex flex-col items-center gap-3 text-xs text-muted-foreground animate-pulse">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span>Generating secure preview stream...</span>
+              <span>Streaming secure preview from Supabase...</span>
             </div>
           ) : errorMsg ? (
             <div className="p-8 text-center space-y-2">
