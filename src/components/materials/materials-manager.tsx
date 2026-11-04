@@ -10,6 +10,8 @@ import {
   Layers,
   Sparkles,
   Loader2,
+  Eye,
+  Download,
 } from "lucide-react";
 import { StudyMaterialItem, SyllabusModule } from "@/types/academic";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAcademic } from "@/components/academic-provider";
 import { useAuth } from "@/components/auth-provider";
+import { PDFViewerModal } from "@/components/viewer/pdf-viewer-modal";
 
 interface MaterialsManagerProps {
   courseId: string;
@@ -36,6 +39,12 @@ export function MaterialsManager({
   const [uploadTitle, setUploadTitle] = React.useState("");
   const [isUploading, setIsUploading] = React.useState(false);
   const [uploadFeedback, setUploadFeedback] = React.useState<string | null>(null);
+
+  // PDF Viewer Modal State
+  const [viewerOpen, setViewerOpen] = React.useState(false);
+  const [viewerTitle, setViewerTitle] = React.useState("");
+  const [viewerStoragePath, setViewerStoragePath] = React.useState<string | undefined>(undefined);
+  const [viewerBlobUrl, setViewerBlobUrl] = React.useState<string | undefined>(undefined);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -79,7 +88,6 @@ export function MaterialsManager({
         formData.append("userId", user.id);
       }
 
-      // Call live document extraction API
       const res = await fetch("/api/materials/upload", {
         method: "POST",
         body: formData,
@@ -118,6 +126,14 @@ export function MaterialsManager({
     }
   };
 
+  const handleOpenViewer = (mat: StudyMaterialItem) => {
+    setViewerTitle(mat.title);
+    // If material has storage path in supabase
+    const storagePath = `${user?.id || "anonymous"}/${courseId}/${mat.fileName}`;
+    setViewerStoragePath(storagePath);
+    setViewerOpen(true);
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -128,6 +144,15 @@ export function MaterialsManager({
 
   return (
     <div className="space-y-6">
+      {/* PDF Viewer Dialog */}
+      <PDFViewerModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        title={viewerTitle}
+        storagePath={viewerStoragePath}
+        pdfUrl={viewerBlobUrl}
+      />
+
       {/* Upload Zone */}
       <div
         onDragEnter={handleDrag}
@@ -259,8 +284,17 @@ export function MaterialsManager({
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenViewer(mat)}
+                      className="h-8 gap-1.5 text-xs text-foreground"
+                    >
+                      <Eye className="h-3.5 w-3.5 text-primary" />
+                      <span>View PDF</span>
+                    </Button>
                     <Badge variant="matcha" className="gap-1 text-[10px]">
-                      <FileCheck2 className="h-3 w-3" /> Indexed for RAG
+                      <FileCheck2 className="h-3 w-3" /> Indexed
                     </Badge>
                   </div>
                 </div>

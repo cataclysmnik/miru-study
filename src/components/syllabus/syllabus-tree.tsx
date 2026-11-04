@@ -14,12 +14,15 @@ import {
   Trash2,
   Check,
   X,
+  Eye,
+  UploadCloud,
 } from "lucide-react";
 import { Syllabus, SyllabusModule, SyllabusTopic } from "@/types/academic";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAcademic } from "@/components/academic-provider";
 import { SyllabusUploadModal } from "@/components/syllabus/syllabus-upload-modal";
+import { PDFViewerModal } from "@/components/viewer/pdf-viewer-modal";
 
 interface SyllabusTreeProps {
   courseId: string;
@@ -52,6 +55,9 @@ export function SyllabusTree({ courseId, courseName, syllabus }: SyllabusTreePro
 
   const [editingTopicId, setEditingTopicId] = React.useState<string | null>(null);
   const [editTopicTitle, setEditTopicTitle] = React.useState("");
+
+  // Syllabus PDF Viewer Modal State
+  const [viewerOpen, setViewerOpen] = React.useState(false);
 
   const toggleModule = (modId: string) => {
     setExpandedModules((prev) => ({ ...prev, [modId]: !prev[modId] }));
@@ -114,7 +120,15 @@ export function SyllabusTree({ courseId, courseName, syllabus }: SyllabusTreePro
 
   return (
     <div className="space-y-6">
-      {/* Syllabus Header Bar with Upload Button */}
+      {/* Syllabus Viewer Modal */}
+      <PDFViewerModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        title={`${courseName} — Syllabus Document`}
+        storagePath={`syllabus/${courseId}/latest.pdf`}
+      />
+
+      {/* Syllabus Header Bar with Upload & View Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border bg-card gap-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
@@ -131,6 +145,16 @@ export function SyllabusTree({ courseId, courseName, syllabus }: SyllabusTreePro
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setViewerOpen(true)}
+            className="h-8 gap-1.5 text-xs"
+          >
+            <Eye className="h-3.5 w-3.5 text-primary" />
+            <span>View Syllabus File</span>
+          </Button>
+
           <SyllabusUploadModal courseId={courseId} courseName={courseName} />
         </div>
       </div>
