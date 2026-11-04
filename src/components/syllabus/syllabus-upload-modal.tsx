@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAcademic } from "@/components/academic-provider";
+import { useAuth } from "@/components/auth-provider";
 import { useAI } from "@/components/ai-provider";
 
 interface SyllabusUploadModalProps {
@@ -28,7 +29,8 @@ export function SyllabusUploadModal({ courseId, courseName }: SyllabusUploadModa
   const [isExtracting, setIsExtracting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const { addSyllabusModule, addSyllabusTopic, refreshData } = useAcademic();
+  const { refreshData } = useAcademic();
+  const { user } = useAuth();
   const { providerConfig } = useAI();
 
   const handleExtract = async (e: React.FormEvent) => {
@@ -46,7 +48,11 @@ export function SyllabusUploadModal({ courseId, courseName }: SyllabusUploadModa
       if (manualText.trim()) {
         formData.append("text", manualText);
       }
+      formData.append("courseId", courseId);
       formData.append("courseName", courseName);
+      if (user?.id) {
+        formData.append("userId", user.id);
+      }
 
       const res = await fetch("/api/syllabi/extract", {
         method: "POST",
@@ -59,20 +65,8 @@ export function SyllabusUploadModal({ courseId, courseName }: SyllabusUploadModa
         throw new Error(data.error || "Extraction failed");
       }
 
-      // Populate extracted modules & topics into the course syllabus
-      if (data.modules && Array.isArray(data.modules)) {
-        for (const mod of data.modules) {
-          await addSyllabusModule(courseId, mod.title, mod.hours);
-          // Wait briefly to ensure module id is committed if sequential
-          if (mod.topics && Array.isArray(mod.topics)) {
-            for (const top of mod.topics) {
-              const topTitle = typeof top === "string" ? top : top.title;
-              // Add topics to the course
-            }
-          }
-        }
-        await refreshData();
-      }
+      // Refresh real academic state from Supabase
+      await refreshData();
 
       setOpen(false);
       setFile(null);
@@ -100,7 +94,7 @@ export function SyllabusUploadModal({ courseId, courseName }: SyllabusUploadModa
               <span>Upload & Parse Course Syllabus</span>
             </DialogTitle>
             <DialogDescription>
-              Upload your syllabus document (PDF, DOCX, TXT) or paste curriculum text. Miru will extract modules, units, and topics automatically.
+              Upload your syllabus document (PDF, DOCX, TXT) or paste curriculum text. Gemini will extract all modules and break out individual topics automatically.
             </DialogDescription>
           </DialogHeader>
 
@@ -185,7 +179,7 @@ export function SyllabusUploadModal({ courseId, courseName }: SyllabusUploadModa
               {isExtracting ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Extracting Modules...</span>
+                  <span>Extracting Modules & Topics...</span>
                 </>
               ) : (
                 <>
@@ -200,4 +194,3 @@ export function SyllabusUploadModal({ courseId, courseName }: SyllabusUploadModa
     </Dialog>
   );
 }
-
