@@ -3,22 +3,30 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   Save,
   Download,
-  Sparkles,
-  Share2,
-  FileCheck2,
   BookOpen,
   Copy,
   Check,
   Clock,
   Printer,
+  Sparkles,
 } from "lucide-react";
 import { useAI } from "@/components/ai-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+// Dynamically import BlockNote to prevent SSR window issues
+const BlockNoteDocumentEditor = dynamic(
+  () =>
+    import("@/components/editor/blocknote-editor").then(
+      (mod) => mod.BlockNoteDocumentEditor
+    ),
+  { ssr: false, loading: () => <div className="p-8 text-xs text-muted-foreground animate-pulse">Loading BlockNote TipTap Editor...</div> }
+);
 
 export default function ResourceEditorPage() {
   const params = useParams();
@@ -38,9 +46,8 @@ export default function ResourceEditorPage() {
     }
   }, [resource]);
 
-  // Mindful autosave simulation
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value);
+  const handleEditorMarkdownChange = (newMarkdown: string) => {
+    setContent(newMarkdown);
     setSaveStatus("saving");
     setTimeout(() => {
       setSaveStatus("saved");
@@ -137,17 +144,13 @@ export default function ResourceEditorPage() {
         </div>
       )}
 
-      {/* Block Document Editor Area */}
-      <div className="rounded-2xl border border-border bg-card shadow-sm p-6 sm:p-10 space-y-4">
-        <textarea
-          value={content}
-          onChange={handleContentChange}
-          rows={28}
-          className="w-full bg-transparent text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none resize-none font-mono selection:bg-primary/20"
-          placeholder="Begin writing notes or formatting formulas..."
+      {/* BlockNote Document Canvas */}
+      <div className="rounded-2xl border border-border bg-card shadow-sm p-4 sm:p-8 min-h-[600px]">
+        <BlockNoteDocumentEditor
+          initialMarkdown={resource.contentMarkdown}
+          onChangeMarkdown={handleEditorMarkdownChange}
         />
       </div>
     </div>
   );
 }
-
