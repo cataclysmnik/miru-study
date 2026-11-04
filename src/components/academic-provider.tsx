@@ -25,7 +25,11 @@ interface AcademicContextType {
   addSemester: (yearId: string, name: string, status?: Semester["status"]) => Promise<void>;
   updateTopicStatus: (courseId: string, moduleId: string, topicId: string, status: "not_started" | "in_progress" | "completed" | "needs_revision") => Promise<void>;
   addSyllabusModule: (courseId: string, title: string, hours?: string) => Promise<void>;
+  editSyllabusModule: (courseId: string, moduleId: string, title: string, hours?: string) => Promise<void>;
+  deleteSyllabusModule: (courseId: string, moduleId: string) => Promise<void>;
   addSyllabusTopic: (courseId: string, moduleId: string, title: string) => Promise<void>;
+  editSyllabusTopic: (courseId: string, moduleId: string, topicId: string, title: string) => Promise<void>;
+  deleteSyllabusTopic: (courseId: string, moduleId: string, topicId: string) => Promise<void>;
   addStudyMaterial: (courseId: string, file: { title: string; fileName: string; fileType: "pdf" | "docx" | "pptx" | "txt" | "markdown" | "image"; fileSizeBytes: number; moduleId?: string }) => void;
   refreshData: () => Promise<void>;
 }
@@ -53,7 +57,7 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // 1. Fetch Academic Years & Semesters
-      const { data: yearsData, error: yearsErr } = await supabase
+      const { data: yearsData } = await supabase
         .from("academic_years")
         .select(`
           id,
@@ -73,7 +77,6 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
 
       let loadedYears: AcademicYear[] = (yearsData as any) || [];
 
-      // If user has zero academic years, automatically create their first academic year and semester
       if (loadedYears.length === 0) {
         const { data: newYear } = await supabase
           .from("academic_years")
@@ -114,7 +117,7 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
       setActiveSemester(activeSem);
 
       // 2. Fetch User's Real Courses with Syllabi, Modules, Topics, and Study Materials
-      const { data: coursesData, error: coursesErr } = await supabase
+      const { data: coursesData } = await supabase
         .from("courses")
         .select(`
           id,
@@ -272,7 +275,7 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     try {
-      const { data: newCourse, error } = await supabase
+      const { data: newCourse } = await supabase
         .from("courses")
         .insert({
           user_id: user.id,
@@ -288,7 +291,6 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (newCourse) {
-        // Automatically create active syllabus record
         await supabase.from("syllabi").insert({
           user_id: user.id,
           course_id: newCourse.id,
@@ -325,7 +327,6 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (!user) return;
 
-    // Optimistically update client state
     setCourses((prevCourses) =>
       prevCourses.map((course) => {
         if (course.id !== courseId) return course;
@@ -361,7 +362,6 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
       })
     );
 
-    // Persist to Supabase topic_progress table
     await supabase
       .from("topic_progress")
       .upsert({
@@ -372,10 +372,9 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
       }, { onConflict: "user_id,topic_id" });
   };
 
-  // Real Database Insert: Syllabus Module
+  // Module Management
   const addSyllabusModule = async (courseId: string, title: string, hours?: string) => {
     if (!user) return;
-
     const course = courses.find((c) => c.id === courseId);
     if (!course) return;
 
@@ -386,7 +385,7 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
         syllabus_id: course.syllabus.id,
         order_index: course.syllabus.modules.length + 1,
         title,
-        hours_or_weightage: hours || "10 Hours",
+        hours_or_weightage: hours || "4 hours",
       })
       .select()
       .single();
@@ -396,10 +395,30 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Real Database Insert: Syllabus Topic
+  const editSyllabusModule = async (courseId: string, moduleId: string, title: string, hours?: string) => {
+    if (!user) return;
+    await supabase
+      .from("syllabus_modules")
+      .update({
+        title,
+        hours_or_weightage: hours || undefined,
+      })
+      .eq("id", moduleId)
+      .eq("user_id", user.id);
+
+    await loadWorkspaceData();
+  };
+
+  const deleteSyllabusModule = async (courseId: string, moduleId: string) => {
+    if (!user) return;
+    await supabase.from("syllabus_topics").delete().eq("module_id", moduleId).eq("user_id", user.id);
+    await supabase.from("syllabus_modules").delete().eq("id", moduleId).eq("user_id", user.id);
+    await loadWorkspaceData();
+  };
+
+  // Topic Management
   const addSyllabusTopic = async (courseId: string, moduleId: string, title: string) => {
     if (!user) return;
-
     const course = courses.find((c) => c.id === courseId);
     const mod = course?.syllabus.modules.find((m) => m.id === moduleId);
 
@@ -419,6 +438,24 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const editSyllabusTopic = async (courseId: string, moduleId: string, topicId: string, title: string) => {
+    if (!user) return;
+    await supabase
+      .from("syllabus_topics")
+      .update({ title })
+      .eq("id", topicId)
+      .eq("user_id", user.id);
+
+    await loadWorkspaceData();
+  };
+
+  const deleteSyllabusTopic = async (courseId: string, moduleId: string, topicId: string) => {
+    if (!user) return;
+    await supabase.from("topic_progress").delete().eq("topic_id", topicId).eq("user_id", user.id);
+    await supabase.from("syllabus_topics").delete().eq("id", topicId).eq("user_id", user.id);
+    await loadWorkspaceData();
+  };
+
   const addStudyMaterial = (courseId: string, file: any) => {
     loadWorkspaceData();
   };
@@ -436,7 +473,11 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
         addSemester,
         updateTopicStatus,
         addSyllabusModule,
+        editSyllabusModule,
+        deleteSyllabusModule,
         addSyllabusTopic,
+        editSyllabusTopic,
+        deleteSyllabusTopic,
         addStudyMaterial,
         refreshData: loadWorkspaceData,
       }}
