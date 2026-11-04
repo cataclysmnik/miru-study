@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 45 42% 98%;
+    --foreground: 0 0% 24%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 24%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 24%;
+    --primary: 84 41% 49%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 34 43% 84%;
+    --secondary-foreground: 0 0% 24%;
+    --muted: 43 38% 95%;
+    --muted-foreground: 0 0% 46%;
+    --accent: 84 35% 92%;
+    --accent-foreground: 84 41% 25%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 34 35% 85%;
+    --input: 34 35% 85%;
+    --ring: 84 41% 49%;
+    --radius: 0.75rem;
+
+    --matcha-glow: rgba(107, 128, 72, 0.15);
+  }
+
+  .dark {
+    --background: 60 6% 10%;
+    --foreground: 47 18% 89%;
+    --card: 60 7% 12%;
+    --card-foreground: 47 18% 89%;
+    --popover: 60 7% 12%;
+    --popover-foreground: 47 18% 89%;
+    --primary: 84 41% 49%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 30 7% 16%;
+    --secondary-foreground: 47 18% 89%;
+    --muted: 45 6% 15%;
+    --muted-foreground: 49 6% 62%;
+    --accent: 84 25% 18%;
+    --accent-foreground: 84 41% 75%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 45 7% 20%;
+    --input: 45 7% 20%;
+    --ring: 84 41% 49%;
+
+    --matcha-glow: rgba(107, 128, 72, 0.25);
+  }
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Custom scrollbar matching wabi-sabi aesthetics */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.45);
+}
+

@@ -1,70 +1,51 @@
-# Getting Started with Create React App
+# Miru — Personal Academic Workspace & AI-Powered Learning Operating System
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Miru is a student-first personal academic operating system and AI-powered learning management platform crafted for university students. Miru embraces a mindful Japanese wabi-sabi design philosophy (earthy neutrals, warm beige, matcha green accents) that prioritises quiet focus over institutional clutter.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Key Capabilities
 
-### `npm start`
+- **Academic Hierarchy**: Customisable Academic Years, Semesters, Courses, Modules, and Topics.
+- **Syllabus & Material Management**: Grounded in your actual uploaded notes, slides, and syllabi.
+- **Syllabus-Aware AI Studio**: Generates grounded notes, revision summaries, flashcards, and exam-style questions with verifiable citations.
+- **Rich Block Editor**: BlockNote-powered document editing with inline AI assistance.
+- **Offline-First PWA**: Study, revise, and review cached materials with seamless sync upon reconnection.
+- **BYOK & Built-in AI**: Secure encrypted storage for personal OpenAI / Google Gemini API keys.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Tech Stack
 
-### `npm test`
+- **Framework**: Next.js 15 (App Router), React 19, TypeScript (strict)
+- **Styling**: Tailwind CSS v4, Lucide Icons, Radix UI primitives
+- **Auth & Database**: Supabase Auth (Google OAuth), PostgreSQL with Row Level Security (RLS) & `pgvector`
+- **Editor**: BlockNote (TipTap / ProseMirror)
+- **Offline & State**: Service Workers, IndexedDB (Dexie), TanStack Query
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## Getting Started
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 1. Install Dependencies
+```bash
+npm install
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 2. Configure Environment Variables
+Copy `.env.example` to `.env.local` and add your credentials:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+PLATFORM_AI_PROVIDER=gemini
+PLATFORM_AI_API_KEY=your_gemini_api_key
+CREDENTIAL_ENCRYPTION_KEY=32_byte_hex_encryption_key
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 3. Run Development Server
+```bash
+npm run dev
+```
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Open [http://localhost:3000](http://localhost:3000) to view the workspace.
