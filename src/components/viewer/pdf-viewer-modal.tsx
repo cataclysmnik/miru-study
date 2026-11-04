@@ -108,11 +108,11 @@ export function PDFViewerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
-      {/* Dynamic Theme Opaque Scrim Backdrop:
+      {/* Dynamic Theme Opaque Scrim Backdrop with aesthetic backdrop blur:
           Light Mode: Warm Sand/Stone dimming
           Dark Mode: Rich Wabi-Sabi Dark Slate/Earth dimming */}
       <div
-        className="fixed inset-0 bg-stone-900/60 dark:bg-black/75 transition-opacity duration-200"
+        className="fixed inset-0 bg-stone-900/60 dark:bg-black/75 backdrop-blur-md transition-opacity duration-200"
         onClick={() => onOpenChange(false)}
       />
 
